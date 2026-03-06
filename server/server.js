@@ -1,15 +1,19 @@
 import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
-import { GoogleGenAI } from "@google/genai";
+import OpenAI from "openai";
 
 dotenv.config();
 
 const app = express();
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY }); // ✅ apiKey 명시
 
 app.use(cors());
 app.use(express.json());
+
+const client = new OpenAI({
+  apiKey: process.env.API_KEY,
+  baseURL: "https://api.groq.com/openai/v1",
+});
 
 app.post("/explain", async (req, res) => {
   const { word, sentence } = req.body;
@@ -18,29 +22,48 @@ app.post("/explain", async (req, res) => {
     return res.status(400).json({ error: "word and sentence are required" });
   }
 
-  const prompt = `
-Explain the meaning of the word "${word}" in the sentence below.
+const prompt = `Given a sentence and a target word, explain the meaning of the word as it is used in that sentence.
 
-Sentence:
-${sentence}
+Rules:
+- Explain in Korean in one sentence, ending with "~니다"
+- Korean only, no English, no Chinese characters, no special characters, no bullet points
+- Use context from the sentence to determine the correct meaning
+- If the context is unclear or insufficient, provide the most common/universal meaning
+- Do NOT mention the word "${word}" in the output
+- Do NOT use phrases like "이 단어는", "그 단어는", "해당 단어는"
+- Start directly with the meaning explanation
 
-Explain briefly in Korean in one sentence.
-`;
+Sentence: ${sentence}
+Target word: ${word}
+
+Output:`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-lite",
-      contents: prompt,
+    const response = await client.chat.completions.create({
+      model: "llama-3.3-70b-versatile", // 모델명
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 100,
+      temperature: 0.1,
     });
 
-    const text = response.text ?? "설명을 가져오지 못했습니다.";
+    const text =
+      response.choices[0].message.content?.trim() ??
+      "설명을 가져오지 못했습니다.";
     res.json({ explanation: text });
   } catch (err) {
-    console.error("Gemini error:", err.message);
-    res.status(500).json({ error: err.message }); // ✅ 에러 메시지 노출
+    console.error("API server error:", err.message);
+
+    if (err.status === 429) {
+      return res.status(429).json({
+        error: "요청 제한 초과. 잠시 후 다시 시도해주세요.",
+        retryAfter: 60,
+      });
+    }
+
+    res.status(500).json({ error: err.message });
   }
 });
 
 app.listen(3000, () => {
-  console.log("Server running on port 3000");
+  console.log("✅ OpenRouter Server running on port 3000");
 });
