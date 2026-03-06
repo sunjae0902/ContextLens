@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "ContextLens",
+  "version": "0.1.0",
+  "description": "Context-based word meaning for articles",
+
+  "permissions": ["activeTab", "scripting"],
+
+  "background": {
+    "service_worker": "src/background/background.js"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/content.js"] 
+    }
+  ]
+}
