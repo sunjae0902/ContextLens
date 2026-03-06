@@ -106,20 +106,34 @@ function createPopup(text, x, y) {
   }, 4000);
 }
 
-function handleSelection() {
+// 선택 시 api 호출
+async function handleSelection() {
   const info = getSelectionInfo();
-
   if (!info) return;
 
   const pos = getSelectionPosition();
-
   if (!pos) return;
 
   console.log("Selection:", info);
 
-    const popupText = `${info.word}\n\n${info.sentence}`;
+  createPopup(`${info.word}\n\nLoading...`, pos.x, pos.y);
 
-  createPopup(popupText, pos.x, pos.y);
+  chrome.runtime.sendMessage(
+    {
+      type: "GET_MEANING",
+      word: info.word,
+      sentence: info.sentence,
+    },
+    (response) => {
+      if (!response) return;
+
+      const popupText = `${info.word}\n\n${response.meaning}`;
+
+      if (currentPopup) {
+        currentPopup.textContent = popupText;
+      }
+    }
+  );
 }
 
 // 드래그 선택
