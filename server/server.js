@@ -67,7 +67,7 @@ app.post("/explain", async (req, res) => {
 
 # Constraints:
 1. Output ONLY one complete Korean sentence ending with "~합니다" or "~입니다".
-2. NO English, NO Chinese characters (한자), NO special characters.
+2. NO English, NO Chinese characters (한자), NO other foreign languages, NO special characters.
 3. NEVER mention the target word "${word}" in the explanation.
 4. DO NOT use indicator phrases like "이 단어는", "그 단어는", "해당 단어는".
 5. Start the explanation directly. Ensure the sentence has a clear subject and predicate.
