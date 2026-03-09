@@ -63,16 +63,19 @@ app.post("/explain", async (req, res) => {
     });
   }
 
-  const prompt = `Given a sentence and a target word, explain the meaning of the word as it is used in that sentence.
+  const prompt = `# Task: Explain the meaning of the target word based on the sentence context.
 
-Rules:
-- Explain in Korean in one sentence, ending with "~니다"
-- Korean only, no English, no Chinese characters, no special characters, no bullet points
-- Use context from the sentence to determine the correct meaning
-- If the context is unclear or insufficient, provide the most common/universal meaning
-- Do NOT mention the word "${word}" in the output
-- Do NOT use phrases like "이 단어는", "그 단어는", "해당 단어는"
-- Start directly with the meaning explanation
+# Constraints:
+1. Output ONLY one complete Korean sentence ending with "~합니다" or "~입니다".
+2. NO English, NO Chinese characters (한자), NO special characters.
+3. NEVER mention the target word "${word}" in the explanation.
+4. DO NOT use indicator phrases like "이 단어는", "그 단어는", "해당 단어는".
+5. Start the explanation directly. Ensure the sentence has a clear subject and predicate.
+
+# Example Style:
+- Correct: 사물이나 현상의 중심이 되는 가장 중요한 부분을 뜻합니다.
+- Incorrect: 핵심이란 사물의 중심. (No ending)
+- Incorrect: 核心 부분을 의미합니다. (No Hanja)
 
 Sentence: ${sentence}
 Target word: ${word}
