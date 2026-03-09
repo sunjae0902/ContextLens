@@ -215,3 +215,21 @@ document.addEventListener("selectionchange", () => {
     }, 100);
   }
 });
+
+// 바깥 영역 닫기
+document.addEventListener("mousedown", (e) => {
+  if (!currentPopup) return;
+
+  // 팝업 내부 클릭이면 무시
+  if (currentPopup.contains(e.target)) return;
+
+  // 바깥 클릭이면 닫기
+  removePopup();
+});
+
+// esc키로 닫기
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    removePopup();
+  }
+});
