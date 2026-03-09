@@ -1,8 +1,30 @@
 let currentPopup = null;
+let isLoading = false;
+
+// spinner style
+if (!document.getElementById("dict-spinner-style")) {
+  const style = document.createElement("style");
+  style.id = "dict-spinner-style";
+  style.textContent = `
+  .dict-spinner{
+    width:14px;
+    height:14px;
+    border:2px solid #555;
+    border-top:2px solid #fff;
+    border-radius:50%;
+    animation:dict-spin 0.8s linear infinite;
+  }
+
+  @keyframes dict-spin{
+    from{transform:rotate(0deg)}
+    to{transform:rotate(360deg)}
+  }
+  `;
+  document.head.appendChild(style);
+}
 
 function getSelectionInfo() {
   const selection = window.getSelection();
-
   if (!selection || selection.rangeCount === 0) return null;
 
   const selectedText = selection.toString().trim();
@@ -11,7 +33,6 @@ function getSelectionInfo() {
   const range = selection.getRangeAt(0);
   let node = range.startContainer;
 
-  // text node면 parent element로 이동
   if (node.nodeType === Node.TEXT_NODE) {
     node = node.parentElement;
   }
@@ -23,7 +44,6 @@ function getSelectionInfo() {
 
   if (index === -1) return null;
 
-  // 문장 시작
   let start = index;
   while (start > 0) {
     const char = text[start - 1];
@@ -31,7 +51,6 @@ function getSelectionInfo() {
     start--;
   }
 
-  // 문장 끝
   let end = index + selectedText.length;
   while (end < text.length) {
     const char = text[end];
@@ -52,7 +71,6 @@ function getSelectionInfo() {
 
 function getSelectionPosition() {
   const selection = window.getSelection();
-
   if (!selection.rangeCount) return null;
 
   const range = selection.getRangeAt(0);
@@ -71,110 +89,72 @@ function removePopup() {
   }
 }
 
-function createPopup(text, x, y, isError = false) {
+function createPopup(x, y, isError = false) {
   removePopup();
 
   const popup = document.createElement("div");
 
-  // 팝업 스타일
-  popup.style.position = "absolute";
-  popup.style.left = `${x}px`;
-  popup.style.top = `${y + 8}px`;
-  popup.style.background = isError ? "#fee" : "#fefefe";
-  popup.style.color = isError ? "#c33" : "#111";
-  popup.style.padding = "12px 16px 12px 16px";
-  popup.style.borderRadius = "12px";
-  popup.style.fontSize = "14px";
-  popup.style.fontFamily = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
-  popup.style.maxWidth = "280px";
-  popup.style.lineHeight = "1.5";
-  popup.style.whiteSpace = "pre-line";
-  popup.style.textAlign = "left";
-  popup.style.boxShadow = "0 8px 24px rgba(0,0,0,0.15)";
-  popup.style.border = isError ? "1px solid #fcc" : "1px solid #eee";
-  popup.style.transition = "all 0.2s ease-in-out";
-  popup.style.opacity = "0";
-  popup.style.transform = "translateY(-5px)";
-  popup.style.zIndex = 999999;
+  Object.assign(popup.style, {
+    position: "absolute",
+    left: `${x}px`,
+    top: `${y + 12}px`,
+    background: isError ? "rgba(45,20,20,0.95)" : "rgba(30,30,32,0.98)",
+    color: isError ? "#ff9999" : "#e0e0e0",
+    padding: "16px",
+    borderRadius: "14px",
+    fontSize: "14px",
+    maxWidth: "300px",
+    lineHeight: "1.6",
+    boxShadow: "0 12px 32px rgba(0,0,0,0.4)",
+    border: isError ? "1px solid #663333" : "1px solid #444",
+    opacity: "0",
+    transform: "translateY(-8px)",
+    transition: "all .25s",
+    zIndex: "2147483647",
+  });
 
-  // X 버튼 추가
-  const closeBtn = document.createElement("span");
-  closeBtn.textContent = "✕";
-  closeBtn.style.position = "absolute";
-  closeBtn.style.top = "6px";
-  closeBtn.style.right = "10px";
-  closeBtn.style.cursor = "pointer";
-  closeBtn.style.fontSize = "12px";
-  closeBtn.style.color = isError ? "#c33" : "#888";
-  closeBtn.addEventListener(
-    "mouseenter",
-    () => (closeBtn.style.color = isError ? "#a22" : "#111")
-  );
-  closeBtn.addEventListener(
-    "mouseleave",
-    () => (closeBtn.style.color = isError ? "#c33" : "#888")
-  );
-  closeBtn.addEventListener("click", removePopup);
-
-  popup.appendChild(closeBtn);
-
-  // 아이콘 추가 (로딩/에러 구분)
-  const icon = document.createElement("span");
-  icon.style.marginRight = "8px";
-  icon.style.fontSize = "16px";
-  icon.textContent = isError ? "⚠️" : "";
-  popup.appendChild(icon);
-
-  // 텍스트 내용
   const content = document.createElement("div");
-  content.textContent = text;
-  content.style.paddingTop = "4px";
+  content.className = "dict-content";
+
+  content.innerHTML = `
+    <div class="dict-spinner"></div>
+  `;
+
   popup.appendChild(content);
 
   document.body.appendChild(popup);
   currentPopup = popup;
 
-  // 등장 애니메이션
   requestAnimationFrame(() => {
     popup.style.opacity = "1";
     popup.style.transform = "translateY(0)";
   });
-
-  // ✅ 자동 닫기 기능 완전 제거
-
-  // 팝업 외 영역 클릭 시 닫기
-  const clickOutsideListener = (e) => {
-    if (!popup.contains(e.target)) {
-      removePopup();
-      document.removeEventListener("mousedown", clickOutsideListener);
-    }
-  };
-  document.addEventListener("mousedown", clickOutsideListener);
 }
 
-// 개선된 선택 처리
+function updatePopup(meaning) {
+  if (!currentPopup) return;
+
+  const content = currentPopup.querySelector(".dict-content");
+
+  content.innerHTML = `
+  <div style="color:#bbb">
+  ${meaning}
+  </div>
+  `;
+}
+
 async function handleSelection() {
+  if (isLoading) return;
+
   const info = getSelectionInfo();
-  if (!info) {
-    console.log("❌ 유효한 텍스트를 선택해주세요");
-    return;
-  }
+  if (!info) return;
 
   const pos = getSelectionPosition();
-  if (!pos) {
-    createPopup(
-      "선택 위치를 찾을 수 없습니다.",
-      pos?.x || 100,
-      pos?.y || 100,
-      true
-    );
-    return;
-  }
+  if (!pos) return;
 
-  console.log("📝 Selection:", info);
+  isLoading = true;
 
-  // 로딩 팝업 표시
-  createPopup(`${info.word}\n\n설명 가져오는 중...`, pos.x, pos.y);
+  createPopup(pos.x, pos.y);
 
   try {
     chrome.runtime.sendMessage(
@@ -184,102 +164,50 @@ async function handleSelection() {
         sentence: info.sentence,
       },
       (response) => {
-        // chrome.runtime.lastError 체크
+        isLoading = false;
+
         if (chrome.runtime.lastError) {
-          console.error("Runtime 오류:", chrome.runtime.lastError.message);
-          if (currentPopup) {
-            currentPopup.remove();
-          }
-          createPopup(
-            "확장 프로그램과 연결할 수 없습니다.\n확장 프로그램이 활성화되어 있는지 확인해주세요.",
-            pos.x,
-            pos.y,
-            true
-          );
+          updatePopup("확장 프로그램 연결 오류");
           return;
         }
 
         if (!response) {
-          if (currentPopup) {
-            currentPopup.remove();
-          }
-          createPopup(
-            "응답을 받지 못했습니다.\n다시 선택해보세요.",
-            pos.x,
-            pos.y,
-            true
-          );
+          updatePopup("응답을 받지 못했습니다.");
           return;
         }
 
-        // 백그라운드 스크립트에서 받은 응답 처리
-        if (response.success === false || response.error) {
-          const errorMsg = response.error || "알 수 없는 오류가 발생했습니다.";
-          if (currentPopup) {
-            currentPopup.remove();
-          }
-          createPopup(errorMsg, pos.x, pos.y, true);
-          return;
-        }
-
-        // 성공 응답
         const meaning =
           response.explanation ||
           response.meaning ||
           "설명을 가져오지 못했습니다.";
-        if (currentPopup) {
-          // 기존 팝업 내용 업데이트
-          const closeBtn = currentPopup.querySelector("span");
-          const icon = currentPopup.querySelector("span:nth-child(2)");
-          const content = currentPopup.querySelector("div");
 
-          if (icon) icon.remove();
-          if (closeBtn) closeBtn.style.color = "#888";
-          currentPopup.style.background = "#fefefe";
-          currentPopup.style.color = "#111";
-          currentPopup.style.border = "1px solid #eee";
-          content.textContent = meaning;
-        }
+        updatePopup(meaning);
       }
     );
   } catch (error) {
-    console.error("handleSelection 오류:", error);
-    if (currentPopup) {
-      currentPopup.remove();
-    }
-    createPopup(
-      "오류가 발생했습니다.\n브라우저를 새로고침해보세요.",
-      pos.x,
-      pos.y,
-      true
-    );
+    isLoading = false;
+    updatePopup("오류가 발생했습니다.");
   }
 }
 
-// 드래그 선택 (mouseup)
 document.addEventListener("mouseup", () => {
-  // 50ms 딜레이로 선택 완료 대기
   setTimeout(() => {
-    // 선택이 해제된 경우 무시
     if (window.getSelection().toString().trim()) {
       handleSelection();
     }
   }, 50);
 });
 
-// 더블 클릭
-document.addEventListener("dblclick", (e) => {
-  setTimeout(() => {
-    handleSelection();
-  }, 10);
+document.addEventListener("dblclick", () => {
+  setTimeout(handleSelection, 10);
 });
 
-// 키보드 선택 (Shift + 클릭 후 해제 감지)
 document.addEventListener("selectionchange", () => {
   const selection = window.getSelection().toString().trim();
+
   if (selection && !currentPopup) {
-    // 100ms 후 선택 처리 (연속 호출 방지)
     clearTimeout(window.selectionTimeout);
+
     window.selectionTimeout = setTimeout(() => {
       if (window.getSelection().toString().trim()) {
         handleSelection();
